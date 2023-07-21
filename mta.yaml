@@ -1,0 +1,90 @@
+_schema-version: "3.1"
+ID: bookshop2
+description: A simple CAP project.
+version: 1.0.0
+modules:
+- name: bookshop2-srv
+  type: nodejs
+  path: gen/srv
+  requires:
+  - name: bookshop2-db
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+  parameters:
+    buildpack: nodejs_buildpack
+  build-parameters:
+    builder: npm-ci
+- name: bookshop2-db-deployer
+  type: hdb
+  path: gen/db
+  requires:
+  - name: bookshop2-db
+  parameters:
+    buildpack: nodejs_buildpack
+- name: bookshop2-destination-content
+  type: com.sap.application.content
+  requires:
+  - name: bookshop2-destination-service
+    parameters:
+      content-target: true
+  - name: bookshop2_html_repo_host
+    parameters:
+      service-key:
+        name: bookshop2_html_repo_host-key
+  - name: uaa_bookshop2
+    parameters:
+      service-key:
+        name: uaa_bookshop2-key
+  parameters:
+    content:
+      instance:
+        destinations:
+        - Name: bookshop2_bookshop2_html_repo_host
+          ServiceInstanceName: bookshop2-html5-app-host-service
+          ServiceKeyName: bookshop2_html_repo_host-key
+          sap.cloud.service: bookshop2
+        - Authentication: OAuth2UserTokenExchange
+          Name: bookshop2_uaa_bookshop2
+          ServiceInstanceName: bookshop2-xsuaa-service
+          ServiceKeyName: uaa_bookshop2-key
+          sap.cloud.service: bookshop2
+        existing_destinations_policy: ignore
+  build-parameters:
+    no-source: true
+resources:
+- name: bookshop2-db
+  type: com.sap.xs.hdi-container
+  parameters:
+    service: hana
+    service-plan: hdi-shared
+- name: bookshop2-destination-service
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      HTML5Runtime_enabled: true
+      version: 1.0.0
+    service: destination
+    service-name: bookshop2-destination-service
+    service-plan: lite
+- name: bookshop2_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-name: bookshop2-html5-app-host-service
+    service-plan: app-host
+- name: uaa_bookshop2
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: bookshop2-xsuaa-service
+    service-plan: application
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+  - builder: custom
+    commands:
+    - npx -p @sap/cds-dk cds build --production
